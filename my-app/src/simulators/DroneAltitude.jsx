@@ -472,7 +472,7 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
       <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
         {/* Simulation Window */}
         <div style={{ ...panelStyles.base, padding: '15px', position: 'relative' }}>
-{/* Simulator Selector Dropdown */}
+          {/* Simulator Selector Dropdown */}
           <select
             value={activeSimulator}
             onChange={(e) => onSimulatorChange(e.target.value)}
