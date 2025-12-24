@@ -471,9 +471,9 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
       {/* Top Row: Left Panel + Simulation + Control Panel */}
       <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
         {/* Left Button Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '200px', flexShrink: 0 }}>
+        <div style={{ ...panelStyles.base, padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px', width: '175px', flexShrink: 0 }}>
           {/* Simulator Selector */}
-          <div style={{ ...panelStyles.base, padding: '12px' }}>
+          <div>
             <label style={{ display: 'block', color: colors.text.secondary, fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Simulator
             </label>
@@ -500,16 +500,14 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
           </div>
 
           {/* Simulation Controls */}
-          <div style={{ ...panelStyles.base, padding: '12px' }}>
-            <SimulationControls
-              isRunning={isRunning}
-              onToggle={handleToggle}
-              actions={[
-                { label: '🎯 NEW TARGET', onClick: changeSetpoint, disabled: !isRunning || stateRef.current.crashed, variant: 'secondary' },
-                { label: '⚖️ ADD WEIGHT', onClick: addWeight, disabled: !isRunning || stateRef.current.crashed, variant: 'accent' }
-              ]}
-            />
-          </div>
+          <SimulationControls
+            isRunning={isRunning}
+            onToggle={handleToggle}
+            actions={[
+              { label: '🎯 NEW TARGET', onClick: changeSetpoint, disabled: !isRunning || stateRef.current.crashed, variant: 'secondary' },
+              { label: '⚖️ ADD WEIGHT', onClick: addWeight, disabled: !isRunning || stateRef.current.crashed, variant: 'accent' }
+            ]}
+          />
         </div>
 
         {/* Simulation Window */}

@@ -377,9 +377,9 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
       {/* Top Row: Left Panel + Simulation + Control Panel */}
       <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
         {/* Left Button Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '200px', flexShrink: 0 }}>
+        <div style={{ ...panelStyles.base, padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px', width: '175px', flexShrink: 0 }}>
           {/* Simulator Selector */}
-          <div style={{ ...panelStyles.base, padding: '12px' }}>
+          <div>
             <label style={{ display: 'block', color: colors.text.secondary, fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Simulator
             </label>
@@ -406,16 +406,14 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
           </div>
 
           {/* Simulation Controls */}
-          <div style={{ ...panelStyles.base, padding: '12px' }}>
-            <SimulationControls
-              isRunning={isRunning}
-              onToggle={handleToggle}
-              actions={[
-                { label: '🎯 NEW TARGET', onClick: changeSetpoint, variant: 'secondary' },
-                { label: '🌡️ CHANGE AMBIENT', onClick: changeAmbient, variant: 'info' }
-              ]}
-            />
-          </div>
+          <SimulationControls
+            isRunning={isRunning}
+            onToggle={handleToggle}
+            actions={[
+              { label: '🎯 NEW TARGET', onClick: changeSetpoint, variant: 'secondary' },
+              { label: '🌡️ CHANGE AMBIENT', onClick: changeAmbient, variant: 'info' }
+            ]}
+          />
         </div>
 
         {/* Simulation Window */}
