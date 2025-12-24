@@ -373,7 +373,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '1450px', margin: '0 auto' }}>
       {/* Top Row: Simulation + Control Panel */}
       <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
         {/* Simulation Window */}
@@ -402,7 +402,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
               <option key={sim.id} value={sim.id}>{sim.label}</option>
             ))}
           </select>
-          <canvas ref={canvasRef} width={700} height={380} style={{ borderRadius: '8px' }} />
+          <canvas ref={canvasRef} width={950} height={380} style={{ borderRadius: '8px' }} />
           <SimulationControls
             isRunning={isRunning}
             onToggle={handleToggle}
@@ -444,7 +444,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
             { data: plotData.errorHistory, label: 'Error (°C)', color: '#ff3366' },
             { data: plotData.powerHistory, label: 'Control (kW)', color: '#ffcc00' }
           ]}
-          width={1100}
+          width={1350}
           height={220}
         />
       </div>

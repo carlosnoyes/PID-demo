@@ -13,7 +13,7 @@ const FRICTION_PENDULUM = 0.01;
 const NOISE_AMPLITUDE = 0.002;
 const DT = 0.001;
 const RENDER_INTERVAL = 16;
-const TRACK_WIDTH = 10.0;
+const TRACK_WIDTH = 14.0;
 const SCALE = 65;
 
 // Default PID values
@@ -110,8 +110,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     }
 
     if (Math.abs(state.x) > TRACK_WIDTH / 2 - 0.2) {
-      state.x = Math.sign(state.x) * (TRACK_WIDTH / 2 - 0.2);
-      state.xDot = -state.xDot * 0.5;
+      state.fallen = true;
     }
   }, []);
 
@@ -169,7 +168,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     // Track markers
     ctx.strokeStyle = '#3a5a8a';
     ctx.lineWidth = 2;
-    for (let i = -5; i <= 5; i++) {
+    for (let i = -7; i <= 7; i++) {
       const markerX = centerX + i * SCALE;
       ctx.beginPath();
       ctx.moveTo(markerX, groundY - 5);
@@ -270,12 +269,13 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     ctx.arc(pivotX, pivotY, 50, -Math.PI / 2, -Math.PI / 2 + state.theta, state.theta > 0);
     ctx.stroke();
 
-    // Fallen text
+    // Fallen/Crashed text
     if (state.fallen) {
+      const isCrashed = Math.abs(state.x) > TRACK_WIDTH / 2 - 0.3;
       ctx.fillStyle = 'rgba(200, 50, 50, 0.9)';
       ctx.font = 'bold 36px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('FALLEN!', centerX, height * 0.3);
+      ctx.fillText(isCrashed ? 'CRASHED!' : 'FALLEN!', centerX, height * 0.3);
       ctx.font = '18px "JetBrains Mono", monospace';
       ctx.fillStyle = '#aaa';
       ctx.fillText('Press Start to try again', centerX, height * 0.3 + 35);
@@ -401,7 +401,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '1450px', margin: '0 auto' }}>
       {/* Top Row: Simulation + Control Panel */}
       <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
         {/* Simulation Window */}
@@ -430,7 +430,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
               <option key={sim.id} value={sim.id}>{sim.label}</option>
             ))}
           </select>
-          <canvas ref={canvasRef} width={700} height={380} style={{ borderRadius: '8px' }} />
+          <canvas ref={canvasRef} width={950} height={380} style={{ borderRadius: '8px' }} />
           <SimulationControls
             isRunning={isRunning}
             onToggle={handleToggle}
@@ -468,7 +468,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
             { data: plotData.errorHistory, label: 'Error (deg)', color: '#ff3366' },
             { data: plotData.forceHistory, label: 'Control (N)', color: '#ffcc00' }
           ]}
-          width={1100}
+          width={1350}
           height={220}
         />
       </div>
