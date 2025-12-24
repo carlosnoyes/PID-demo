@@ -515,6 +515,8 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
           onPidChange={(changes) => setPidGains(prev => ({ ...prev, ...changes }))}
           pidConfig={PID_CONFIG}
           onResetGains={() => setPidGains(DEFAULT_PID)}
+          accumulatedError={pidController.current.getState().integral}
+          onResetError={() => pidController.current.resetIntegral()}
           manualControls={manualControls}
           statusDisplay={
             <StatusDisplay items={[

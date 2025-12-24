@@ -12,6 +12,8 @@ import { colors, fonts, panelStyles, getButtonStyle, sliderStyles } from '../uti
  * @param {Function} props.onPidChange - Called with { kp?, ki?, kd? } when gains change
  * @param {Object} props.pidConfig - { kpMax, kiMax, kdMax } for slider ranges
  * @param {Function} props.onResetGains - Called when reset gains is clicked
+ * @param {number} props.accumulatedError - Current accumulated integral error
+ * @param {Function} props.onResetError - Called when reset error is clicked
  * @param {React.ReactNode} props.manualControls - Custom content for manual mode
  * @param {React.ReactNode} props.statusDisplay - Status display content
  */
@@ -22,6 +24,8 @@ const ControlPanel = ({
   onPidChange,
   pidConfig = { kpMax: 100, kiMax: 50, kdMax: 50 },
   onResetGains,
+  accumulatedError = 0,
+  onResetError,
   manualControls,
   statusDisplay
 }) => {
@@ -118,6 +122,38 @@ const ControlPanel = ({
               />
             </div>
           ))}
+
+          {/* Accumulated Error Display */}
+          <div style={{
+            marginTop: '20px',
+            padding: '12px',
+            background: 'rgba(0, 0, 0, 0.3)',
+            borderRadius: '6px',
+            border: '1px solid rgba(100, 150, 200, 0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ color: colors.text.muted, fontSize: '11px' }}>Accumulated Error</span>
+              <button
+                onClick={onResetError}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '9px',
+                  fontWeight: '600',
+                  borderRadius: '3px',
+                  border: '1px solid rgba(100, 150, 200, 0.3)',
+                  cursor: 'pointer',
+                  background: 'rgba(45, 55, 72, 0.6)',
+                  color: colors.text.secondary,
+                  fontFamily: fonts.mono
+                }}
+              >
+                RESET
+              </button>
+            </div>
+            <div style={{ color: colors.integral, fontSize: '16px', fontWeight: 'bold', textAlign: 'center' }}>
+              {accumulatedError.toFixed(2)}
+            </div>
+          </div>
         </>
       ) : (
         manualControls
