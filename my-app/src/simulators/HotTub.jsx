@@ -44,7 +44,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
   const lastRenderRef = useRef(0);
-  const pidController = useRef(createPIDController({ integralMin: -100, integralMax: 100 }));
+  const pidController = useRef(createPIDController());
 
   const stateRef = useRef({
     temperature: 38,

@@ -40,7 +40,7 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
   const lastRenderRef = useRef(0);
-  const pidController = useRef(createPIDController({ integralMin: -50, integralMax: 50 }));
+  const pidController = useRef(createPIDController());
 
   const stateRef = useRef({
     altitude: 50,

@@ -59,8 +59,8 @@ export function createPIDController(config = {}) {
   };
 
   const defaults = {
-    integralMin: -100,
-    integralMax: 100,
+    integralMin: -Infinity,
+    integralMax: Infinity,
     ...config
   };
 

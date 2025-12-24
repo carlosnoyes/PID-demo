@@ -40,7 +40,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
   const lastRenderRef = useRef(0);
-  const pidController = useRef(createPIDController({ integralMin: -10, integralMax: 10 }));
+  const pidController = useRef(createPIDController());
 
   const stateRef = useRef({
     theta: 0.05,
