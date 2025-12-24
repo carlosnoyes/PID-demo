@@ -447,7 +447,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
 
         {/* Simulation Window */}
         <div style={{ ...panelStyles.base, padding: '15px', flex: 1 }}>
-          <canvas ref={canvasRef} width={950} height={380} style={{ borderRadius: '8px' }} />
+          <canvas ref={canvasRef} width={598} height={380} style={{ borderRadius: '8px' }} />
         </div>
 
         {/* Control Panel */}
@@ -470,8 +470,8 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
         />
       </div>
 
-      {/* Bottom Row: Data Tracking (full width) */}
-      <div style={{ ...panelStyles.base, width: '100%' }}>
+      {/* Bottom Row: Data Tracking */}
+      <div style={{ ...panelStyles.base, padding: '15px' }}>
         <DataChart
           timeHistory={plotData.timeHistory}
           series={[
@@ -480,7 +480,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
             { data: plotData.errorHistory, label: 'Error (deg)', color: '#ff3366' },
             { data: plotData.forceHistory, label: 'Control (N)', color: '#ffcc00' }
           ]}
-          width={1350}
+          width={980}
           height={220}
         />
       </div>

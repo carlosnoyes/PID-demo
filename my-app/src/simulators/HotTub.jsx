@@ -420,7 +420,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
 
         {/* Simulation Window */}
         <div style={{ ...panelStyles.base, padding: '15px', flex: 1 }}>
-          <canvas ref={canvasRef} width={950} height={380} style={{ borderRadius: '8px' }} />
+          <canvas ref={canvasRef} width={598} height={380} style={{ borderRadius: '8px' }} />
         </div>
 
         {/* Control Panel */}
@@ -446,8 +446,8 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
         />
       </div>
 
-      {/* Bottom Row: Data Tracking (full width) */}
-      <div style={{ ...panelStyles.base, width: '100%' }}>
+      {/* Bottom Row: Data Tracking */}
+      <div style={{ ...panelStyles.base, padding: '15px' }}>
         <DataChart
           timeHistory={plotData.timeHistory}
           series={[
@@ -456,7 +456,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
             { data: plotData.errorHistory, label: 'Error (°C)', color: '#ff3366' },
             { data: plotData.powerHistory, label: 'Control (kW)', color: '#ffcc00' }
           ]}
-          width={1350}
+          width={980}
           height={220}
         />
       </div>
