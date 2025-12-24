@@ -39,6 +39,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
     powerHistory: [],
     timeHistory: []
   });
+  const timeOffsetRef = useRef(0);
 
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
@@ -62,6 +63,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
       heaterPower: 0
     };
     pidController.current.reset();
+    timeOffsetRef.current = 0;
     setPlotData({ setpointHistory: [], measuredHistory: [], errorHistory: [], powerHistory: [], timeHistory: [] });
     setElapsedTime(0);
     setCurrentTemp(38);
@@ -281,7 +283,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
           measuredHistory: [...prev.measuredHistory, state.temperature],
           errorHistory: [...prev.errorHistory, state.setpoint - state.temperature],
           powerHistory: [...prev.powerHistory, state.heaterPower / 1000],
-          timeHistory: [...prev.timeHistory, state.time]
+          timeHistory: [...prev.timeHistory, state.time - timeOffsetRef.current]
         }));
         setElapsedTime(state.time);
         setCurrentTemp(state.temperature);
@@ -442,7 +444,30 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
       </div>
 
       {/* Bottom Row: Data Tracking */}
-      <div style={{ ...panelStyles.base, padding: '15px', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ ...panelStyles.base, padding: '15px', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
+        <button
+          onClick={() => {
+            timeOffsetRef.current = stateRef.current.time;
+            setPlotData({ setpointHistory: [], measuredHistory: [], errorHistory: [], powerHistory: [], timeHistory: [] });
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '20px',
+            padding: '6px 12px',
+            fontSize: '10px',
+            fontWeight: '600',
+            borderRadius: '4px',
+            border: '1px solid rgba(100, 150, 200, 0.3)',
+            cursor: 'pointer',
+            background: 'rgba(45, 55, 72, 0.8)',
+            color: colors.text.secondary,
+            fontFamily: fonts.mono,
+            zIndex: 10
+          }}
+        >
+          CLEAR PLOT
+        </button>
         <DataChart
           timeHistory={plotData.timeHistory}
           series={[

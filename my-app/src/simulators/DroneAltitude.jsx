@@ -35,6 +35,7 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
     thrustHistory: [],
     timeHistory: []
   });
+  const timeOffsetRef = useRef(0);
 
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
@@ -62,6 +63,7 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
       crashed: false
     };
     pidController.current.reset();
+    timeOffsetRef.current = 0;
     setPlotData({ setpointHistory: [], measuredHistory: [], errorHistory: [], thrustHistory: [], timeHistory: [] });
     setElapsedTime(0);
     setCurrentMass(BASE_DRONE_MASS);
@@ -382,7 +384,7 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
           measuredHistory: [...prev.measuredHistory, state.altitude],
           errorHistory: [...prev.errorHistory, state.setpoint - state.altitude],
           thrustHistory: [...prev.thrustHistory, state.thrust],
-          timeHistory: [...prev.timeHistory, state.time]
+          timeHistory: [...prev.timeHistory, state.time - timeOffsetRef.current]
         }));
         setElapsedTime(state.time);
         setCurrentMass(state.mass);
@@ -535,7 +537,30 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
       </div>
 
       {/* Bottom Row: Data Tracking */}
-      <div style={{ ...panelStyles.base, padding: '15px', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ ...panelStyles.base, padding: '15px', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
+        <button
+          onClick={() => {
+            timeOffsetRef.current = stateRef.current.time;
+            setPlotData({ setpointHistory: [], measuredHistory: [], errorHistory: [], thrustHistory: [], timeHistory: [] });
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '20px',
+            padding: '6px 12px',
+            fontSize: '10px',
+            fontWeight: '600',
+            borderRadius: '4px',
+            border: '1px solid rgba(100, 150, 200, 0.3)',
+            cursor: 'pointer',
+            background: 'rgba(45, 55, 72, 0.8)',
+            color: colors.text.secondary,
+            fontFamily: fonts.mono,
+            zIndex: 10
+          }}
+        >
+          CLEAR PLOT
+        </button>
         <DataChart
           timeHistory={plotData.timeHistory}
           series={[

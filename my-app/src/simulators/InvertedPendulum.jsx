@@ -35,6 +35,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     forceHistory: [],
     timeHistory: []
   });
+  const timeOffsetRef = useRef(0);
 
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
@@ -62,6 +63,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
       force: 0
     };
     pidController.current.reset();
+    timeOffsetRef.current = 0;
     setPlotData({ setpointHistory: [], measuredHistory: [], errorHistory: [], forceHistory: [], timeHistory: [] });
     setElapsedTime(0);
     setNudgeForce(0);
@@ -313,7 +315,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
             measuredHistory: [...prev.measuredHistory, measured],
             errorHistory: [...prev.errorHistory, setpoint - measured],
             forceHistory: [...prev.forceHistory, state.force],
-            timeHistory: [...prev.timeHistory, state.time]
+            timeHistory: [...prev.timeHistory, state.time - timeOffsetRef.current]
           }));
 
           if (!state.fallen) {
@@ -466,7 +468,30 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
       </div>
 
       {/* Bottom Row: Data Tracking */}
-      <div style={{ ...panelStyles.base, padding: '15px', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ ...panelStyles.base, padding: '15px', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
+        <button
+          onClick={() => {
+            timeOffsetRef.current = stateRef.current.time;
+            setPlotData({ setpointHistory: [], measuredHistory: [], errorHistory: [], forceHistory: [], timeHistory: [] });
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '20px',
+            padding: '6px 12px',
+            fontSize: '10px',
+            fontWeight: '600',
+            borderRadius: '4px',
+            border: '1px solid rgba(100, 150, 200, 0.3)',
+            cursor: 'pointer',
+            background: 'rgba(45, 55, 72, 0.8)',
+            color: colors.text.secondary,
+            fontFamily: fonts.mono,
+            zIndex: 10
+          }}
+        >
+          CLEAR PLOT
+        </button>
         <DataChart
           timeHistory={plotData.timeHistory}
           series={[
