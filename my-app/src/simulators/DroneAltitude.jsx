@@ -468,43 +468,53 @@ const DroneAltitudeSimulator = ({ simulators = [], activeSimulator = 'drone', on
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '1450px', margin: '0 auto' }}>
-      {/* Top Row: Simulation + Control Panel */}
+      {/* Top Row: Left Panel + Simulation + Control Panel */}
       <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
+        {/* Left Button Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '200px', flexShrink: 0 }}>
+          {/* Simulator Selector */}
+          <div style={{ ...panelStyles.base, padding: '12px' }}>
+            <label style={{ display: 'block', color: colors.text.secondary, fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Simulator
+            </label>
+            <select
+              value={activeSimulator}
+              onChange={(e) => onSimulatorChange(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                borderRadius: '5px',
+                border: '1px solid rgba(100, 150, 200, 0.3)',
+                background: 'rgba(45, 55, 72, 0.9)',
+                color: colors.text.primary,
+                fontFamily: fonts.mono,
+                cursor: 'pointer'
+              }}
+            >
+              {simulators.map(sim => (
+                <option key={sim.id} value={sim.id}>{sim.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Simulation Controls */}
+          <div style={{ ...panelStyles.base, padding: '12px' }}>
+            <SimulationControls
+              isRunning={isRunning}
+              onToggle={handleToggle}
+              actions={[
+                { label: '🎯 NEW TARGET', onClick: changeSetpoint, disabled: !isRunning || stateRef.current.crashed, variant: 'secondary' },
+                { label: '⚖️ ADD WEIGHT', onClick: addWeight, disabled: !isRunning || stateRef.current.crashed, variant: 'accent' }
+              ]}
+            />
+          </div>
+        </div>
+
         {/* Simulation Window */}
-        <div style={{ ...panelStyles.base, padding: '15px', position: 'relative' }}>
-          {/* Simulator Selector Dropdown */}
-          <select
-            value={activeSimulator}
-            onChange={(e) => onSimulatorChange(e.target.value)}
-            style={{
-              position: 'absolute',
-              top: '15px',
-              right: '15px',
-              padding: '8px 12px',
-              fontSize: '12px',
-              fontWeight: '600',
-              borderRadius: '5px',
-              border: '1px solid rgba(100, 150, 200, 0.3)',
-              background: 'rgba(45, 55, 72, 0.9)',
-              color: colors.text.primary,
-              fontFamily: fonts.mono,
-              cursor: 'pointer',
-              zIndex: 10
-            }}
-          >
-            {simulators.map(sim => (
-              <option key={sim.id} value={sim.id}>{sim.label}</option>
-            ))}
-          </select>
+        <div style={{ ...panelStyles.base, padding: '15px', flex: 1 }}>
           <canvas ref={canvasRef} width={950} height={380} style={{ borderRadius: '8px' }} />
-          <SimulationControls
-            isRunning={isRunning}
-            onToggle={handleToggle}
-            actions={[
-              { label: '🎯 NEW TARGET', onClick: changeSetpoint, disabled: !isRunning || stateRef.current.crashed, variant: 'secondary' },
-              { label: '⚖️ ADD WEIGHT', onClick: addWeight, disabled: !isRunning || stateRef.current.crashed, variant: 'accent' }
-            ]}
-          />
         </div>
 
         {/* Control Panel */}
