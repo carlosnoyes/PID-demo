@@ -13,8 +13,8 @@ const FRICTION_PENDULUM = 0.01;
 const NOISE_AMPLITUDE = 0.002;
 const DT = 0.001;
 const RENDER_INTERVAL = 16;
-const TRACK_WIDTH = 14.0;
-const SCALE = 65;
+const TRACK_WIDTH = 20.0;
+const SCALE = 23;
 
 // Default PID values
 const DEFAULT_PID = { kp: 150, ki: 0, kd: 0 };
@@ -170,7 +170,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     // Track markers
     ctx.strokeStyle = '#3a5a8a';
     ctx.lineWidth = 2;
-    for (let i = -7; i <= 7; i++) {
+    for (let i = -10; i <= 10; i++) {
       const markerX = centerX + i * SCALE;
       ctx.beginPath();
       ctx.moveTo(markerX, groundY - 5);
@@ -186,8 +186,8 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
 
     // Cart
     const cartX = centerX + state.x * SCALE;
-    const cartWidth = 80;
-    const cartHeight = 40;
+    const cartWidth = 40;
+    const cartHeight = 20;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.fillRect(cartX - cartWidth / 2 + 5, groundY - cartHeight + 5, cartWidth, cartHeight);
@@ -205,10 +205,10 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     // Wheels
     ctx.fillStyle = '#2a3a4a';
     ctx.beginPath();
-    ctx.arc(cartX - 25, groundY, 10, 0, Math.PI * 2);
+    ctx.arc(cartX - 12.5, groundY, 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(cartX + 25, groundY, 10, 0, Math.PI * 2);
+    ctx.arc(cartX + 12.5, groundY, 5, 0, Math.PI * 2);
     ctx.fill();
 
     // Pendulum
