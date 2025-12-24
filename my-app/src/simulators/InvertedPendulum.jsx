@@ -28,6 +28,9 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
   const [nudgeForce, setNudgeForce] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [bestTime, setBestTime] = useState(0);
+  const [fallen, setFallen] = useState(false);
+  const [failureType, setFailureType] = useState(null); // 'crashed' or 'fallen'
+  const [accumulatedError, setAccumulatedError] = useState(0);
   const [plotData, setPlotData] = useState({
     setpointHistory: [],
     measuredHistory: [],
@@ -48,7 +51,6 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     x: 0,
     xDot: 0,
     time: 0,
-    fallen: false,
     force: 0
   });
 
@@ -59,7 +61,6 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
       x: 0,
       xDot: 0,
       time: 0,
-      fallen: false,
       force: 0
     };
     pidController.current.reset();
@@ -67,6 +68,9 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     setPlotData({ setpointHistory: [], measuredHistory: [], errorHistory: [], forceHistory: [], timeHistory: [] });
     setElapsedTime(0);
     setNudgeForce(0);
+    setFallen(false);
+    setFailureType(null);
+    setAccumulatedError(0);
     setIsRunning(false);
   }, []);
 
@@ -75,9 +79,9 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     setTimeout(() => setNudgeForce(0), 200);
   }, []);
 
-  const simulateStep = useCallback((force) => {
+  const simulateStep = useCallback((force, currentFallen) => {
     const state = stateRef.current;
-    if (state.fallen) return;
+    if (currentFallen) return null;
 
     const m = PENDULUM_MASS;
     const M = CART_MASS;
@@ -107,13 +111,15 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     while (state.theta > Math.PI) state.theta -= 2 * Math.PI;
     while (state.theta < -Math.PI) state.theta += 2 * Math.PI;
 
-    if (Math.abs(state.theta) > Math.PI / 2) {
-      state.fallen = true;
+    if (Math.abs(state.x) > TRACK_WIDTH / 2 - 0.2) {
+      return 'crashed';
     }
 
-    if (Math.abs(state.x) > TRACK_WIDTH / 2 - 0.2) {
-      state.fallen = true;
+    if (Math.abs(state.theta) > Math.PI / 2) {
+      return 'fallen';
     }
+
+    return null;
   }, []);
 
   const computePIDForce = useCallback(() => {
@@ -225,7 +231,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     ctx.stroke();
 
     const rodGradient = ctx.createLinearGradient(pivotX, pivotY, pendulumEndX, pendulumEndY);
-    if (state.fallen) {
+    if (fallen) {
       rodGradient.addColorStop(0, '#aa4444');
       rodGradient.addColorStop(1, '#cc6666');
     } else {
@@ -247,7 +253,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     // Mass
     ctx.beginPath();
     const massGradient = ctx.createRadialGradient(pendulumEndX - 3, pendulumEndY - 3, 0, pendulumEndX, pendulumEndY, 10);
-    if (state.fallen) {
+    if (fallen) {
       massGradient.addColorStop(0, '#dd6666');
       massGradient.addColorStop(1, '#aa4444');
     } else {
@@ -272,17 +278,16 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     ctx.stroke();
 
     // Fallen/Crashed text
-    if (state.fallen) {
-      const isCrashed = Math.abs(state.x) > TRACK_WIDTH / 2 - 0.3;
+    if (fallen) {
       ctx.fillStyle = 'rgba(200, 50, 50, 0.9)';
       ctx.font = 'bold 36px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(isCrashed ? 'CRASHED!' : 'FALLEN!', centerX, height * 0.3);
+      ctx.fillText(failureType === 'crashed' ? 'CRASHED!' : 'FALLEN!', centerX, height * 0.3);
       ctx.font = '18px "JetBrains Mono", monospace';
       ctx.fillStyle = '#aaa';
       ctx.fillText('Press Start to try again', centerX, height * 0.3 + 35);
     }
-  }, []);
+  }, [fallen, failureType]);
 
   // Animation loop
   useEffect(() => {
@@ -294,6 +299,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
     let lastTime = performance.now();
     let accumulator = 0;
     let lastPlotTime = 0;
+    let localFallen = false;
 
     const loop = (currentTime) => {
       const deltaTime = Math.min(currentTime - lastTime, 50);
@@ -303,7 +309,13 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
       while (accumulator >= DT * 1000) {
         let force = controlMode === 'pid' ? computePIDForce() : userInput * 30;
         force += nudgeForce;
-        simulateStep(force);
+        const failureResult = simulateStep(force, localFallen);
+
+        if (failureResult && !localFallen) {
+          localFallen = true;
+          setFallen(true);
+          setFailureType(failureResult);
+        }
 
         const state = stateRef.current;
         if (state.time - lastPlotTime >= 0.05) {
@@ -318,12 +330,14 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
             timeHistory: [...prev.timeHistory, state.time - timeOffsetRef.current]
           }));
 
-          if (!state.fallen) {
+          if (!localFallen) {
             setElapsedTime(state.time);
           }
+
+          setAccumulatedError(pidController.current.getState().integral);
         }
 
-        if (state.fallen && state.time > bestTime) {
+        if (localFallen && state.time > bestTime) {
           setBestTime(state.time);
         }
 
@@ -442,7 +456,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
             isRunning={isRunning}
             onToggle={handleToggle}
             actions={[
-              { label: '⚡ NUDGE', onClick: applyNudge, disabled: !isRunning || stateRef.current.fallen, variant: 'accent' }
+              { label: '⚡ NUDGE', onClick: applyNudge, disabled: !isRunning || fallen, variant: 'accent' }
             ]}
           />
         </div>
@@ -460,12 +474,15 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
           onPidChange={(changes) => setPidGains(prev => ({ ...prev, ...changes }))}
           pidConfig={PID_CONFIG}
           onResetGains={() => setPidGains(DEFAULT_PID)}
-          accumulatedError={pidController.current.getState().integral}
-          onResetError={() => pidController.current.resetIntegral()}
+          accumulatedError={accumulatedError}
+          onResetError={() => {
+            pidController.current.resetIntegral();
+            setAccumulatedError(0);
+          }}
           manualControls={manualControls}
           statusDisplay={
             <StatusDisplay items={[
-              { label: 'Balance Time', value: elapsedTime, unit: 's', color: stateRef.current.fallen ? colors.danger : colors.success },
+              { label: 'Balance Time', value: elapsedTime, unit: 's', color: fallen ? colors.danger : colors.success },
               { label: 'Best Time', value: bestTime, unit: 's', color: colors.secondary }
             ]} />
           }
