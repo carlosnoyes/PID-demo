@@ -20,7 +20,7 @@ const AMBIENT_MAX = 35;
 
 // Default PID values
 const DEFAULT_PID = { kp: 2500, ki: 0, kd: 0 };
-const PID_CONFIG = { kpMax: 5000, kiMax: 500, kdMax: 20000 };
+const PID_CONFIG = { kpMax: 5000, kiMax: 50, kdMax: 500000 };
 
 const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimulatorChange = () => {} }) => {
   const [isRunning, setIsRunning] = useState(false);
