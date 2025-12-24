@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { InvertedPendulumSimulator, DroneAltitudeSimulator, HotTubSimulator } from './simulators';
-import { colors, fonts } from './utils/styles';
+import { fonts } from './utils/styles';
 
 const SIMULATORS = [
   { id: 'pendulum', label: 'Pendulum', component: InvertedPendulumSimulator },
@@ -15,10 +15,11 @@ function App() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
       background: 'linear-gradient(135deg, #0a0f1a 0%, #1a2035 50%, #0f1a2a 100%)',
       padding: '20px',
-      fontFamily: fonts.mono
+      fontFamily: fonts.mono,
+      overflow: 'hidden'
     }}>
       {/* Active Simulator */}
       {ActiveComponent && (
@@ -29,15 +30,6 @@ function App() {
         />
       )}
 
-      {/* Footer */}
-      <div style={{
-        textAlign: 'center',
-        marginTop: '25px',
-        color: colors.text.dark,
-        fontSize: '11px'
-      }}>
-        <p>PID Control Demo • Modular Architecture</p>
-      </div>
     </div>
   );
 }

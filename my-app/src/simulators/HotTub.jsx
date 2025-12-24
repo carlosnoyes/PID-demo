@@ -373,16 +373,13 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '1450px', margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '1300px', margin: '0 auto' }}>
       {/* Top Row: Left Panel + Simulation + Control Panel */}
       <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
         {/* Left Button Panel */}
         <div style={{ ...panelStyles.base, padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px', width: '175px', flexShrink: 0 }}>
           {/* Simulator Selector */}
           <div>
-            <label style={{ display: 'block', color: colors.text.secondary, fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Simulator
-            </label>
             <select
               value={activeSimulator}
               onChange={(e) => onSimulatorChange(e.target.value)}
@@ -418,7 +415,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
 
         {/* Simulation Window */}
         <div style={{ ...panelStyles.base, padding: '15px', flex: 1 }}>
-          <canvas ref={canvasRef} width={598} height={380} style={{ borderRadius: '8px' }} />
+          <canvas ref={canvasRef} width={498} height={330} style={{ display: 'block', width: '100%', height: 'auto', borderRadius: '8px' }} />
         </div>
 
         {/* Control Panel */}
@@ -445,7 +442,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
       </div>
 
       {/* Bottom Row: Data Tracking */}
-      <div style={{ ...panelStyles.base, padding: '15px' }}>
+      <div style={{ ...panelStyles.base, padding: '15px', width: '100%', boxSizing: 'border-box' }}>
         <DataChart
           timeHistory={plotData.timeHistory}
           series={[
@@ -454,7 +451,7 @@ const HotTubSimulator = ({ simulators = [], activeSimulator = 'hottub', onSimula
             { data: plotData.errorHistory, label: 'Error (°C)', color: '#ff3366' },
             { data: plotData.powerHistory, label: 'Control (kW)', color: '#ffcc00' }
           ]}
-          width={980}
+          width={1140}
           height={220}
         />
       </div>
