@@ -344,24 +344,6 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
 
   useEffect(() => { render(); }, [render]);
 
-  // Keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (controlMode !== 'manual') return;
-      if (e.key === 'ArrowLeft' || e.key === 'a') setUserInput(-1);
-      else if (e.key === 'ArrowRight' || e.key === 'd') setUserInput(1);
-    };
-    const handleKeyUp = (e) => {
-      if (controlMode !== 'manual') return;
-      if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) setUserInput(0);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [controlMode]);
 
   const handleToggle = () => {
     if (isRunning) {
@@ -373,30 +355,53 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
   };
 
   const manualControls = (
-    <div style={{ textAlign: 'center', padding: '20px 0' }}>
-      <p style={{ color: colors.text.secondary, fontSize: '13px', marginBottom: '15px' }}>
-        Use arrow keys or A/D to control the cart
-      </p>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-        <div style={{
-          padding: '15px 20px',
-          background: userInput < 0 ? 'rgba(106, 159, 212, 0.4)' : 'rgba(50, 70, 100, 0.4)',
-          borderRadius: '6px',
-          border: '1px solid rgba(100, 150, 200, 0.3)',
-          color: '#aac',
-          fontSize: '20px'
-        }}>
-          ←
+    <div style={{ padding: '10px 0' }}>
+      <h3 style={{ color: colors.text.secondary, fontSize: '12px', marginBottom: '15px', textAlign: 'center' }}>
+        CART FORCE CONTROL
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ color: colors.info, fontSize: '10px', minWidth: '35px', textAlign: 'right' }}>LEFT</span>
+          <input
+            type="range"
+            min={-1}
+            max={1}
+            step={0.01}
+            value={userInput}
+            onChange={e => setUserInput(Number(e.target.value))}
+            style={{
+              flex: 1,
+              accentColor: userInput < 0 ? colors.info : userInput > 0 ? colors.secondary : colors.text.muted,
+              height: '8px',
+              cursor: 'pointer'
+            }}
+          />
+          <span style={{ color: colors.secondary, fontSize: '10px', minWidth: '35px' }}>RIGHT</span>
         </div>
-        <div style={{
-          padding: '15px 20px',
-          background: userInput > 0 ? 'rgba(106, 159, 212, 0.4)' : 'rgba(50, 70, 100, 0.4)',
-          borderRadius: '6px',
-          border: '1px solid rgba(100, 150, 200, 0.3)',
-          color: '#aac',
-          fontSize: '20px'
-        }}>
-          →
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          <div style={{ padding: '10px 15px', background: 'rgba(0, 0, 0, 0.3)', borderRadius: '6px', textAlign: 'center', width: '100%' }}>
+            <div style={{ color: colors.text.muted, fontSize: '10px', marginBottom: '3px' }}>FORCE</div>
+            <div style={{ color: userInput < 0 ? colors.info : userInput > 0 ? colors.secondary : colors.text.muted, fontSize: '18px', fontWeight: 'bold' }}>
+              {(userInput * 30).toFixed(1)}N
+            </div>
+          </div>
+          <button
+            onClick={() => setUserInput(0)}
+            style={{
+              padding: '8px 20px',
+              fontSize: '11px',
+              fontWeight: '600',
+              borderRadius: '4px',
+              border: '1px solid rgba(100, 150, 200, 0.3)',
+              cursor: 'pointer',
+              background: 'rgba(45, 55, 72, 0.6)',
+              color: colors.text.secondary,
+              fontFamily: fonts.mono,
+              width: '100%'
+            }}
+          >
+            CENTER (0)
+          </button>
         </div>
       </div>
     </div>
