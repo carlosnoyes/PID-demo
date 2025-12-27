@@ -315,6 +315,7 @@ const InvertedPendulumSimulator = ({ simulators = [], activeSimulator = 'pendulu
           localFallen = true;
           setFallen(true);
           setFailureType(failureResult);
+          setIsRunning(false);
         }
 
         const state = stateRef.current;
