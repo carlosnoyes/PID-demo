@@ -954,13 +954,10 @@ const DroneAltitudeStandalone = () => {
       <div style={{ display: 'flex', gap: '20px', width: '100%', alignItems: 'stretch' }}>
 
         {/* Left Control Panel */}
-        <div style={{ ...panelStyles.base, padding: '15px', width: '280px', flexShrink: 0, height: '450px', overflowY: 'auto' }}>
+        <div style={{ ...panelStyles.base, padding: '15px', width: '280px', flexShrink: 0, height: '360px', overflowY: 'auto', boxSizing: 'border-box' }}>
 
           {/* Start/Stop/Reset Buttons */}
           <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ color: colors.text.secondary, fontSize: '12px', marginBottom: '10px', letterSpacing: '2px' }}>
-              SIMULATION CONTROL
-            </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
               {!isRunning ? (
                 <button
@@ -988,9 +985,6 @@ const DroneAltitudeStandalone = () => {
 
           {/* Drone Weight */}
           <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ color: colors.text.secondary, fontSize: '12px', marginBottom: '10px', letterSpacing: '2px' }}>
-              DRONE WEIGHT
-            </h3>
             <Slider
               label="Mass"
               value={droneMass}
@@ -1092,17 +1086,17 @@ const DroneAltitudeStandalone = () => {
         </div>
 
         {/* Center: Simulation Window */}
-        <div style={{ ...panelStyles.base, padding: '15px', flex: 1, minWidth: 0, height: '450px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ ...panelStyles.base, padding: '15px', flex: 1, minWidth: 0, height: '360px', display: 'flex', alignItems: 'stretch', justifyContent: 'stretch', boxSizing: 'border-box' }}>
           <canvas
             ref={canvasRef}
             width={600}
-            height={400}
-            style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', borderRadius: '8px' }}
+            height={330}
+            style={{ display: 'block', width: '100%', height: '100%', borderRadius: '8px' }}
           />
         </div>
 
         {/* Right Control Panel: PID + Status */}
-        <div style={{ ...panelStyles.base, padding: '15px', width: '280px', flexShrink: 0, height: '450px', overflowY: 'auto' }}>
+        <div style={{ ...panelStyles.base, padding: '15px', width: '280px', flexShrink: 0, height: '360px', overflowY: 'auto', boxSizing: 'border-box' }}>
 
           {/* PID Gains */}
           <div style={{ marginBottom: '20px' }}>
