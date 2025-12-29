@@ -513,15 +513,15 @@ const GRAVITY = 9.81;
 const MIN_MASS = 1.0;
 const MAX_MASS = 100.0;
 const DEFAULT_MASS = 10.0;
-const MAX_THRUST = 2000;  // Maximum upward thrust
-const MIN_THRUST = -2000; // Negative thrust for faster descent
+const MAX_THRUST = 5000;  // Maximum upward thrust
+const MIN_THRUST = -5000; // Negative thrust for faster descent
 const DT = 0.001;
 const RENDER_INTERVAL = 16;
 const MAX_ALTITUDE = 100;
 
 // Default PID values
-const DEFAULT_PID = { kp: 50, ki: 5, kd: 30 };
-const PID_CONFIG = { kpMax: 200, kiMax: 100, kdMax: 100 };
+const DEFAULT_PID = { kp: 100, ki: 10, kd: 50 };
+const PID_CONFIG = { kpMax: 500, kiMax: 100, kdMax: 250 };
 
 // Setpoint modes
 const SETPOINT_MODES = {
