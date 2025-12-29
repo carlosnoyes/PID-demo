@@ -14,11 +14,10 @@ function App() {
 
   return (
     <div style={{
-      height: '100vh',
+      minHeight: '100vh',
       background: 'linear-gradient(135deg, #0a0f1a 0%, #1a2035 50%, #0f1a2a 100%)',
-      padding: '20px',
       fontFamily: fonts.mono,
-      overflow: 'hidden'
+      overflow: 'auto'
     }}>
       {/* Active Simulator */}
       {ActiveComponent && (

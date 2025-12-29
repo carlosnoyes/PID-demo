@@ -947,8 +947,7 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
       margin: '0 auto',
       padding: '20px',
       fontFamily: fonts.mono,
-      background: colors.background.dark,
-      minHeight: '100vh'
+      background: colors.background.dark
     }}>
       {/* Top Row: Left Panel + Simulation + Right Panel */}
       <div style={{ display: 'flex', gap: '20px', width: '100%', alignItems: 'stretch' }}>
