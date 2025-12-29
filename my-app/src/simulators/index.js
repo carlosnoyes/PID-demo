@@ -1,5 +1,6 @@
 // Simulators barrel export
 export { default as InvertedPendulumSimulator } from './InvertedPendulum';
+export { default as InvertedPendulumStandaloneSimulator } from './InvertedPendulumStandalone';
 export { default as DroneAltitudeSimulator } from './DroneAltitude';
 export { default as DroneAltitudeStandaloneSimulator } from './DroneAltitudeStandalone';
 export { default as HotTubSimulator } from './HotTub';

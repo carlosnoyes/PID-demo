@@ -1,16 +1,14 @@
 import { useState } from 'react';
-import { InvertedPendulumSimulator, DroneAltitudeSimulator, DroneAltitudeStandaloneSimulator, HotTubSimulator } from './simulators';
+import { InvertedPendulumStandaloneSimulator, DroneAltitudeStandaloneSimulator } from './simulators';
 import { fonts } from './utils/styles';
 
 const SIMULATORS = [
-  { id: 'pendulum', label: 'Pendulum', component: InvertedPendulumSimulator },
-  { id: 'drone', label: 'Drone', component: DroneAltitudeSimulator },
-  { id: 'drone-standalone', label: 'Drone (Standalone)', component: DroneAltitudeStandaloneSimulator },
-  { id: 'hottub', label: 'Hot Tub', component: HotTubSimulator }
+  { id: 'pendulum', label: 'Pendulum', component: InvertedPendulumStandaloneSimulator },
+  { id: 'drone', label: 'Drone', component: DroneAltitudeStandaloneSimulator }
 ];
 
 function App() {
-  const [activeSimulator, setActiveSimulator] = useState('pendulum');
+  const [activeSimulator, setActiveSimulator] = useState('drone');
 
   const ActiveComponent = SIMULATORS.find(s => s.id === activeSimulator)?.component;
 
@@ -30,7 +28,6 @@ function App() {
           onSimulatorChange={setActiveSimulator}
         />
       )}
-
     </div>
   );
 }

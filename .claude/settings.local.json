@@ -5,7 +5,8 @@
       "Bash(mkdir:*)",
       "Bash(timeout 3 curl:*)",
       "Bash(npm run dev:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

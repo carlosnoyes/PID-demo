@@ -113,7 +113,7 @@ function createPIDController(config = {}) {
     integral: 0,
     prevError: 0,
     initialized: false,
-    derivativeHistory: [] // Store last 5 derivative values for moving average
+    derivativeHistory: []
   };
 
   const defaults = {
@@ -130,16 +130,13 @@ function createPIDController(config = {}) {
         Math.min(defaults.integralMax, state.integral + error * dt)
       );
 
-      // Calculate raw derivative (avoid derivative kick on first call)
       const rawDerivative = state.initialized ? (error - state.prevError) / dt : 0;
 
-      // Add to derivative history
       state.derivativeHistory.push(rawDerivative);
       if (state.derivativeHistory.length > defaults.derivativeWindowSize) {
         state.derivativeHistory.shift();
       }
 
-      // Calculate moving average of derivative
       const derivative = state.derivativeHistory.reduce((sum, val) => sum + val, 0) / state.derivativeHistory.length;
 
       const output = gains.kp * error + gains.ki * newIntegral + gains.kd * derivative;
@@ -212,7 +209,6 @@ const DataChart = ({
     });
 
     return series.map(({ data, label, sharedAxis, fixedBounds, clampedBounds }) => {
-      // If fixedBounds are specified, use them
       if (fixedBounds) {
         return fixedBounds;
       }
@@ -232,7 +228,6 @@ const DataChart = ({
           const absMax = Math.max(Math.abs(min), Math.abs(max));
           const rangeWithMargin = absMax * (1 + margin);
 
-          // If clampedBounds specified, clamp the range
           if (clampedBounds) {
             const clampedRange = Math.min(rangeWithMargin, Math.max(Math.abs(clampedBounds.min), Math.abs(clampedBounds.max)));
             return { min: -clampedRange, max: clampedRange };
@@ -256,7 +251,6 @@ const DataChart = ({
         const absMax = Math.max(Math.abs(min), Math.abs(max));
         const rangeWithMargin = absMax * (1 + margin);
 
-        // If clampedBounds specified, clamp the range
         if (clampedBounds) {
           const clampedRange = Math.min(rangeWithMargin, Math.max(Math.abs(clampedBounds.min), Math.abs(clampedBounds.max)));
           return { min: -clampedRange, max: clampedRange };
@@ -510,25 +504,30 @@ const DataChart = ({
 // PHYSICS CONSTANTS
 // ============================================================================
 const GRAVITY = 9.81;
-const MIN_MASS = 1.0;
-const MAX_MASS = 100.0;
-const DEFAULT_MASS = 10.0;
-const MAX_THRUST = 2000;  // Maximum upward thrust
-const MIN_THRUST = -2000; // Negative thrust for faster descent
+const PENDULUM_LENGTH = 2.0;
+const PENDULUM_MASS = 0.25;
+const CART_MASS = 1.0;
+const FRICTION_CART = 0.1;
+const FRICTION_PENDULUM = 0.01;
+const NOISE_AMPLITUDE = 0.002;
 const DT = 0.001;
 const RENDER_INTERVAL = 16;
-const MAX_ALTITUDE = 100;
+const TRACK_WIDTH = 20.0;
+const SCALE = 23;
 
 // Default PID values
-const DEFAULT_PID = { kp: 50, ki: 5, kd: 30 };
-const PID_CONFIG = { kpMax: 200, kiMax: 100, kdMax: 100 };
+const DEFAULT_PID = { kp: 250, ki: 25, kd: 75 };
+const PID_CONFIG = { kpMax: 1000, kiMax: 200, kdMax: 200 };
 
-// Setpoint modes
-const SETPOINT_MODES = {
-  CONSTANT: 'constant',
-  SINE: 'sine',
-  BOX: 'box'
+// Disturbance types
+const DISTURBANCE_TYPES = {
+  OFF: 'off',
+  NUDGES: 'nudges',
+  TILTS: 'tilts'
 };
+
+// Impulse duration for nudges (seconds)
+const NUDGE_IMPULSE_DURATION = 0.5;
 
 // ============================================================================
 // SLIDER COMPONENT
@@ -554,23 +553,21 @@ const Slider = ({ label, value, onChange, min, max, step = 1, unit = '', color =
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimulatorChange = () => {} }) => {
+const InvertedPendulumStandalone = ({ simulators = [], activeSimulator = '', onSimulatorChange = () => {} }) => {
   // Simulation state
   const [isRunning, setIsRunning] = useState(false);
   const [pidGains, setPidGains] = useState(DEFAULT_PID);
-  const [cumulativeError, setCumulativeError] = useState(0);
-  const [currentThrust, setCurrentThrust] = useState(0);
+  const [fallen, setFallen] = useState(false);
+  const [failureType, setFailureType] = useState(null);
+  const [accumulatedError, setAccumulatedError] = useState(0);
+  const [currentForce, setCurrentForce] = useState(0);
 
-  // Drone mass
-  const [droneMass, setDroneMass] = useState(DEFAULT_MASS);
-
-  // Setpoint mode configuration
-  const [setpointMode, setSetpointMode] = useState(SETPOINT_MODES.CONSTANT);
-  const [constantSetpoint, setConstantSetpoint] = useState(50);
-  const [sineAmplitude, setSineAmplitude] = useState(20);
-  const [sineFrequency, setSineFrequency] = useState(0.1);
-  const [boxAmplitude, setBoxAmplitude] = useState(20);
-  const [boxFrequency, setBoxFrequency] = useState(0.1);
+  // Disturbance configuration
+  const [disturbanceType, setDisturbanceType] = useState(DISTURBANCE_TYPES.OFF);
+  const [nudgeAmplitude, setNudgeAmplitude] = useState(30);
+  const [nudgeFrequency, setNudgeFrequency] = useState(0.5);
+  const [tiltAmplitude, setTiltAmplitude] = useState(5); // degrees
+  const [tiltFrequency, setTiltFrequency] = useState(0.2);
 
   const [plotData, setPlotData] = useState({
     setpointHistory: [],
@@ -578,7 +575,7 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
     errorPHistory: [],
     errorIHistory: [],
     errorDHistory: [],
-    thrustHistory: [],
+    forceHistory: [],
     timeHistory: []
   });
   const timeOffsetRef = useRef(0);
@@ -589,93 +586,121 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
   const pidController = useRef(createPIDController());
 
   const stateRef = useRef({
-    altitude: 50,
-    velocity: 0,
-    mass: DEFAULT_MASS,
-    setpoint: 50,
+    theta: 0.05,
+    thetaDot: 0,
+    x: 0,
+    xDot: 0,
     time: 0,
-    thrust: 0,
-    crashed: false
+    force: 0,
+    floorTilt: 0
   });
 
-  // Calculate setpoint based on mode and time
-  const calculateSetpoint = useCallback((time) => {
-    const baseSetpoint = 50; // Center altitude
+  // Calculate nudge force based on time (short impulses, alternating left/right)
+  const calculateNudgeForce = useCallback((time) => {
+    if (disturbanceType !== DISTURBANCE_TYPES.NUDGES) return 0;
 
-    switch (setpointMode) {
-      case SETPOINT_MODES.CONSTANT:
-        return constantSetpoint;
+    const period = 1 / nudgeFrequency;
+    const timeInPeriod = time % period;
+    const halfPeriod = period / 2;
 
-      case SETPOINT_MODES.SINE:
-        // Sine wave centered at 50m
-        return baseSetpoint + sineAmplitude * Math.sin(2 * Math.PI * sineFrequency * time);
+    // Determine if we're in the first or second half of the period (for alternating direction)
+    const isFirstHalf = timeInPeriod < halfPeriod;
+    const timeInHalf = isFirstHalf ? timeInPeriod : timeInPeriod - halfPeriod;
 
-      case SETPOINT_MODES.BOX:
-        // Box/square wave centered at 50m
-        const period = 1 / boxFrequency;
-        const phase = (time % period) / period;
-        return baseSetpoint + (phase < 0.5 ? boxAmplitude : -boxAmplitude);
-
-      default:
-        return constantSetpoint;
+    // Only apply force during impulse duration
+    if (timeInHalf < NUDGE_IMPULSE_DURATION) {
+      const direction = isFirstHalf ? 1 : -1;
+      return nudgeAmplitude * direction;
     }
-  }, [setpointMode, constantSetpoint, sineAmplitude, sineFrequency, boxAmplitude, boxFrequency]);
+
+    return 0;
+  }, [disturbanceType, nudgeAmplitude, nudgeFrequency]);
+
+  // Calculate floor tilt angle based on time (sinusoidal, in radians)
+  const calculateTiltAngle = useCallback((time) => {
+    if (disturbanceType !== DISTURBANCE_TYPES.TILTS) return 0;
+
+    const amplitudeRad = tiltAmplitude * Math.PI / 180; // Convert degrees to radians
+    // Sinusoidal tilt
+    return amplitudeRad * Math.sin(2 * Math.PI * tiltFrequency * time);
+  }, [disturbanceType, tiltAmplitude, tiltFrequency]);
 
   const resetSimulation = useCallback(() => {
-    const initialSetpoint = calculateSetpoint(0);
     stateRef.current = {
-      altitude: 50,
-      velocity: 0,
-      mass: droneMass,
-      setpoint: initialSetpoint,
+      theta: (Math.random() - 0.5) * 0.1,
+      thetaDot: 0,
+      x: 0,
+      xDot: 0,
       time: 0,
-      thrust: 0,
-      crashed: false
+      force: 0,
+      floorTilt: 0
     };
     pidController.current.reset();
     timeOffsetRef.current = 0;
-    setPlotData({ setpointHistory: [], measuredHistory: [], errorPHistory: [], errorIHistory: [], errorDHistory: [], thrustHistory: [], timeHistory: [] });
-    setCurrentThrust(0);
-    setCumulativeError(0);
-  }, [droneMass, calculateSetpoint]);
+    setPlotData({ setpointHistory: [], measuredHistory: [], errorPHistory: [], errorIHistory: [], errorDHistory: [], forceHistory: [], timeHistory: [] });
+    setFallen(false);
+    setFailureType(null);
+    setAccumulatedError(0);
+    setCurrentForce(0);
+  }, []);
 
-  const simulateStep = useCallback((controlSignal) => {
+  const simulateStep = useCallback((force, currentFallen, floorTilt) => {
     const state = stateRef.current;
-    if (state.crashed) return;
+    if (currentFallen) return null;
 
-    // Clamp thrust between 0 and MAX_THRUST
-    // 0 thrust means drone falls (no lift)
-    const thrust = Math.max(MIN_THRUST, Math.min(MAX_THRUST, controlSignal));
-    state.thrust = thrust;
+    const m = PENDULUM_MASS;
+    const M = CART_MASS;
+    const l = PENDULUM_LENGTH;
+    const g = GRAVITY;
+    const b = FRICTION_CART;
+    const c = FRICTION_PENDULUM;
+    const { theta, thetaDot, x, xDot } = state;
 
-    // Physics: thrust provides upward force, gravity pulls down
-    const gravityForce = state.mass * GRAVITY;
-    const netForce = thrust - gravityForce;
-    const acceleration = netForce / state.mass;
+    const noise = (Math.random() - 0.5) * 2 * NOISE_AMPLITUDE;
 
-    state.velocity += acceleration * DT;
-    state.altitude += state.velocity * DT;
+    // Effective pendulum angle relative to true vertical (accounting for floor tilt)
+    const effectiveTheta = theta + floorTilt;
+    const sinTheta = Math.sin(effectiveTheta);
+    const cosTheta = Math.cos(effectiveTheta);
+
+    // Cart experiences a gravitational component along the tilted track
+    const cartGravityForce = (M + m) * g * Math.sin(floorTilt);
+
+    const denom = l * (4.0 / 3.0 - (m * cosTheta * cosTheta) / (M + m));
+    const thetaDDot = (g * sinTheta +
+      cosTheta * ((-force - cartGravityForce - m * l * thetaDot * thetaDot * sinTheta + b * xDot) / (M + m)) -
+      c * thetaDot / (m * l) + noise) / denom;
+    const xDDot = (force + cartGravityForce + m * l * (thetaDot * thetaDot * sinTheta - thetaDDot * cosTheta) - b * xDot) / (M + m);
+
+    state.thetaDot += thetaDDot * DT;
+    state.theta += state.thetaDot * DT;
+    state.xDot += xDDot * DT;
+    state.x += state.xDot * DT;
     state.time += DT;
+    state.force = force;
+    state.floorTilt = floorTilt;
 
-    // Update setpoint based on mode
-    state.setpoint = calculateSetpoint(state.time);
+    while (state.theta > Math.PI) state.theta -= 2 * Math.PI;
+    while (state.theta < -Math.PI) state.theta += 2 * Math.PI;
 
-    if (state.altitude <= 0 || state.altitude >= MAX_ALTITUDE) {
-      state.crashed = true;
-      state.altitude = Math.max(0, Math.min(MAX_ALTITUDE, state.altitude));
-      state.velocity = 0;
+    if (Math.abs(state.x) > TRACK_WIDTH / 2 - 0.2) {
+      return 'crashed';
     }
-  }, [calculateSetpoint]);
 
-  const computePIDThrust = useCallback(() => {
+    if (Math.abs(state.theta) > Math.PI / 2) {
+      return 'fallen';
+    }
+
+    return null;
+  }, []);
+
+  const computePIDForce = useCallback(() => {
     const state = stateRef.current;
-    const error = state.setpoint - state.altitude;
-
-    // PID output directly controls thrust - no hover thrust offset
-    // With only P gain and zero error, thrust will be zero and drone will fall
+    const error = state.theta;
     const pidResult = pidController.current.compute(error, pidGains, DT);
-
-    return pidResult;
+    const positionForce = 20 * state.x + 10 * state.xDot;
+    const totalForce = Math.max(-50, Math.min(50, pidResult.output + positionForce));
+    return { ...pidResult, totalForce };
   }, [pidGains]);
 
   const render = useCallback(() => {
@@ -686,169 +711,196 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
     const width = canvas.width;
     const height = canvas.height;
 
-    // Sky gradient
-    const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
-    skyGradient.addColorStop(0, '#1a1a2e');
-    skyGradient.addColorStop(0.5, '#16213e');
-    skyGradient.addColorStop(1, '#1f4037');
-    ctx.fillStyle = skyGradient;
+    // Background
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+    bgGradient.addColorStop(0, '#0a0f1a');
+    bgGradient.addColorStop(1, '#1a1f2e');
+    ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
 
-    const state = stateRef.current;
-
-    // Altitude markers
-    ctx.strokeStyle = 'rgba(100, 200, 150, 0.15)';
+    // Grid
+    ctx.strokeStyle = 'rgba(100, 150, 200, 0.1)';
     ctx.lineWidth = 1;
-    ctx.font = '11px "JetBrains Mono", monospace';
-    ctx.fillStyle = 'rgba(100, 200, 150, 0.4)';
-    ctx.textAlign = 'right';
-
-    for (let alt = 0; alt <= MAX_ALTITUDE; alt += 20) {
-      const y = height - (alt / MAX_ALTITUDE) * (height - 60) - 30;
+    for (let i = 0; i < width; i += 30) {
       ctx.beginPath();
-      ctx.moveTo(50, y);
-      ctx.lineTo(width - 20, y);
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, height);
       ctx.stroke();
-      ctx.fillText(`${alt}m`, 45, y + 4);
+    }
+    for (let i = 0; i < height; i += 30) {
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(width, i);
+      ctx.stroke();
     }
 
-    const droneX = width / 2;
-    const droneY = height - (state.altitude / MAX_ALTITUDE) * (height - 60) - 30;
-    const setpointY = height - (state.setpoint / MAX_ALTITUDE) * (height - 60) - 30;
+    const state = stateRef.current;
+    const centerX = width / 2;
+    const groundY = height * 0.7;
+    const floorTilt = state.floorTilt || 0;
 
-    // Setpoint line
+    // Save context and apply floor tilt rotation
+    ctx.save();
+    ctx.translate(centerX, groundY);
+    ctx.rotate(floorTilt);
+    ctx.translate(-centerX, -groundY);
+
+    // Track
+    ctx.strokeStyle = '#4a6fa5';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(centerX - TRACK_WIDTH / 2 * SCALE, groundY);
+    ctx.lineTo(centerX + TRACK_WIDTH / 2 * SCALE, groundY);
+    ctx.stroke();
+
+    // Track markers
+    ctx.strokeStyle = '#3a5a8a';
+    ctx.lineWidth = 2;
+    for (let i = -10; i <= 10; i++) {
+      const markerX = centerX + i * SCALE;
+      ctx.beginPath();
+      ctx.moveTo(markerX, groundY - 5);
+      ctx.lineTo(markerX, groundY + 5);
+      ctx.stroke();
+      if (i % 2 === 0) {
+        ctx.fillStyle = '#6a8ab5';
+        ctx.font = '12px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${i}m`, markerX, groundY + 20);
+      }
+    }
+
+    // Cart
+    const cartX = centerX + state.x * SCALE;
+    const cartWidth = 40;
+    const cartHeight = 20;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(cartX - cartWidth / 2 + 5, groundY - cartHeight + 5, cartWidth, cartHeight);
+
+    const cartGradient = ctx.createLinearGradient(cartX - cartWidth / 2, groundY - cartHeight, cartX - cartWidth / 2, groundY);
+    cartGradient.addColorStop(0, '#5a7a9a');
+    cartGradient.addColorStop(1, '#3a5a7a');
+    ctx.fillStyle = cartGradient;
+    ctx.fillRect(cartX - cartWidth / 2, groundY - cartHeight, cartWidth, cartHeight);
+
+    ctx.strokeStyle = '#7a9aba';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cartX - cartWidth / 2, groundY - cartHeight, cartWidth, cartHeight);
+
+    // Wheels
+    ctx.fillStyle = '#2a3a4a';
+    ctx.beginPath();
+    ctx.arc(cartX - 12.5, groundY, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cartX + 12.5, groundY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pendulum
+    const pivotX = cartX;
+    const pivotY = groundY - cartHeight;
+    const pendulumEndX = pivotX + PENDULUM_LENGTH * SCALE * Math.sin(state.theta);
+    const pendulumEndY = pivotY - PENDULUM_LENGTH * SCALE * Math.cos(state.theta);
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(pivotX + 3, pivotY + 3);
+    ctx.lineTo(pendulumEndX + 3, pendulumEndY + 3);
+    ctx.stroke();
+
+    const rodGradient = ctx.createLinearGradient(pivotX, pivotY, pendulumEndX, pendulumEndY);
+    if (fallen) {
+      rodGradient.addColorStop(0, '#aa4444');
+      rodGradient.addColorStop(1, '#cc6666');
+    } else {
+      const angleIntensity = Math.min(1, Math.abs(state.theta) / (Math.PI / 4));
+      const r = Math.floor(100 + angleIntensity * 155);
+      const g = Math.floor(200 - angleIntensity * 100);
+      const b = Math.floor(150 - angleIntensity * 50);
+      rodGradient.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
+      rodGradient.addColorStop(1, `rgb(${Math.min(255, r + 50)}, ${Math.min(255, g + 30)}, ${Math.min(255, b + 30)})`);
+    }
+    ctx.strokeStyle = rodGradient;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pivotX, pivotY);
+    ctx.lineTo(pendulumEndX, pendulumEndY);
+    ctx.stroke();
+
+    // Mass
+    ctx.beginPath();
+    const massGradient = ctx.createRadialGradient(pendulumEndX - 3, pendulumEndY - 3, 0, pendulumEndX, pendulumEndY, 10);
+    if (fallen) {
+      massGradient.addColorStop(0, '#dd6666');
+      massGradient.addColorStop(1, '#aa4444');
+    } else {
+      massGradient.addColorStop(0, '#ffdd88');
+      massGradient.addColorStop(1, '#cc9944');
+    }
+    ctx.fillStyle = massGradient;
+    ctx.arc(pendulumEndX, pendulumEndY, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pivot
+    ctx.beginPath();
+    ctx.fillStyle = '#8ab';
+    ctx.arc(pivotX, pivotY, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Angle arc
+    ctx.strokeStyle = 'rgba(255, 200, 100, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(pivotX, pivotY, 50, -Math.PI / 2, -Math.PI / 2 + state.theta, state.theta > 0);
+    ctx.stroke();
+
+    // Restore context (stop rotation for UI elements and setpoint line)
+    ctx.restore();
+
+    // Setpoint line (vertical dashed line at 0 degrees - always vertical, not affected by tilt)
+    // Calculate pivot position in non-rotated space
+    const cosFloorTilt = Math.cos(floorTilt);
+    const sinFloorTilt = Math.sin(floorTilt);
+    const dx = pivotX - centerX;
+    const dy = pivotY - groundY;
+    const rotatedPivotX = centerX + dx * cosFloorTilt - dy * sinFloorTilt;
+    const rotatedPivotY = groundY + dx * sinFloorTilt + dy * cosFloorTilt;
+
     ctx.strokeStyle = '#ff6b6b';
     ctx.lineWidth = 2;
-    ctx.setLineDash([10, 5]);
+    ctx.setLineDash([8, 4]);
     ctx.beginPath();
-    ctx.moveTo(80, setpointY);
-    ctx.lineTo(width - 40, setpointY);
+    ctx.moveTo(rotatedPivotX, rotatedPivotY);
+    ctx.lineTo(rotatedPivotX, rotatedPivotY - PENDULUM_LENGTH * SCALE - 20);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = '#ff6b6b';
-    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    // Angle display
+    const angleDeg = (state.theta * 180 / Math.PI).toFixed(1);
+    const tiltDeg = (floorTilt * 180 / Math.PI).toFixed(1);
+    ctx.fillStyle = colors.text.primary;
+    ctx.font = 'bold 14px "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(`TARGET: ${state.setpoint.toFixed(1)}m`, width - 140, setpointY - 8);
-
-    // Ground
-    const groundGradient = ctx.createLinearGradient(0, height - 30, 0, height);
-    groundGradient.addColorStop(0, '#2d5a3d');
-    groundGradient.addColorStop(1, '#1a3d2a');
-    ctx.fillStyle = groundGradient;
-    ctx.fillRect(0, height - 30, width, 30);
-
-    // Thrust visualization
-    // Positive thrust (upward flames)
-    if (state.thrust > 0) {
-      const thrustIntensity = Math.min(Math.abs(state.thrust) / (state.mass * GRAVITY * 2), 1);
-      const flameHeight = 15 + thrustIntensity * 35;
-      const flameGradient = ctx.createLinearGradient(droneX, droneY + 15, droneX, droneY + 15 + flameHeight);
-      flameGradient.addColorStop(0, `rgba(255, 200, 50, ${0.9 * thrustIntensity})`);
-      flameGradient.addColorStop(0.3, `rgba(255, 100, 30, ${0.7 * thrustIntensity})`);
-      flameGradient.addColorStop(1, 'rgba(255, 50, 0, 0)');
-      ctx.fillStyle = flameGradient;
-      ctx.beginPath();
-      ctx.moveTo(droneX - 12, droneY + 15);
-      ctx.lineTo(droneX + 12, droneY + 15);
-      ctx.lineTo(droneX + 4, droneY + 15 + flameHeight);
-      ctx.lineTo(droneX - 4, droneY + 15 + flameHeight);
-      ctx.closePath();
-      ctx.fill();
+    ctx.fillText(`Angle: ${angleDeg}°`, 20, 30);
+    if (Math.abs(floorTilt) > 0.001) {
+      ctx.fillStyle = colors.info;
+      ctx.fillText(`Tilt: ${tiltDeg}°`, 20, 50);
     }
 
-    // Negative thrust (downward jets - reverse thrust)
-    if (state.thrust < 0) {
-      const thrustIntensity = Math.min(Math.abs(state.thrust) / (state.mass * GRAVITY * 2), 1);
-      const jetHeight = 15 + thrustIntensity * 25;
-      const jetGradient = ctx.createLinearGradient(droneX, droneY - 15, droneX, droneY - 15 - jetHeight);
-      jetGradient.addColorStop(0, `rgba(100, 150, 255, ${0.8 * thrustIntensity})`);
-      jetGradient.addColorStop(0.5, `rgba(150, 180, 255, ${0.5 * thrustIntensity})`);
-      jetGradient.addColorStop(1, 'rgba(100, 150, 255, 0)');
-      ctx.fillStyle = jetGradient;
-      ctx.beginPath();
-      ctx.moveTo(droneX - 10, droneY - 15);
-      ctx.lineTo(droneX + 10, droneY - 15);
-      ctx.lineTo(droneX + 3, droneY - 15 - jetHeight);
-      ctx.lineTo(droneX - 3, droneY - 15 - jetHeight);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // Drone body
-    const bodyGradient = ctx.createLinearGradient(droneX - 25, droneY - 10, droneX + 25, droneY + 10);
-    if (state.crashed) {
-      bodyGradient.addColorStop(0, '#7f1d1d');
-      bodyGradient.addColorStop(0.5, '#991b1b');
-      bodyGradient.addColorStop(1, '#7f1d1d');
-    } else {
-      bodyGradient.addColorStop(0, '#4a5568');
-      bodyGradient.addColorStop(0.5, '#718096');
-      bodyGradient.addColorStop(1, '#4a5568');
-    }
-    ctx.fillStyle = bodyGradient;
-    ctx.beginPath();
-    ctx.roundRect(droneX - 25, droneY - 10, 50, 20, 5);
-    ctx.fill();
-
-    // Arms
-    ctx.strokeStyle = state.crashed ? '#450a0a' : '#2d3748';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(droneX - 20, droneY);
-    ctx.lineTo(droneX - 40, droneY - 8);
-    ctx.moveTo(droneX + 20, droneY);
-    ctx.lineTo(droneX + 40, droneY - 8);
-    ctx.stroke();
-
-    // Propellers
-    if (!state.crashed && state.thrust > 0) {
-      const propAngle = (state.time * 50) % (Math.PI * 2);
-      ctx.strokeStyle = 'rgba(150, 200, 255, 0.7)';
-      ctx.lineWidth = 2;
-      [-40, 40].forEach(offset => {
-        ctx.beginPath();
-        ctx.ellipse(droneX + offset, droneY - 8, 15, 3, propAngle, 0, Math.PI * 2);
-        ctx.stroke();
-      });
-    }
-
-    // Hubs
-    ctx.fillStyle = state.crashed ? '#450a0a' : '#1a202c';
-    [-40, 40].forEach(offset => {
-      ctx.beginPath();
-      ctx.arc(droneX + offset, droneY - 8, 4, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // LED (centered on drone body)
-    const error = Math.abs(state.setpoint - state.altitude);
-    const ledColor = state.crashed ? '#ef4444' : error < 1 ? '#4ade80' : error < 3 ? '#fbbf24' : '#ef4444';
-    ctx.fillStyle = ledColor;
-    ctx.shadowColor = ledColor;
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(droneX, droneY, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Mass display above drone
-    ctx.fillStyle = '#805ad5';
-    ctx.font = 'bold 12px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${state.mass.toFixed(1)}kg`, droneX, droneY - 25);
-
-    // Crashed text
-    if (state.crashed) {
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
-      ctx.font = 'bold 32px "JetBrains Mono", monospace';
+    // Fallen/Crashed text
+    if (fallen) {
+      ctx.fillStyle = 'rgba(200, 50, 50, 0.9)';
+      ctx.font = 'bold 36px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('CRASHED!', width / 2, height / 2 - 20);
-      ctx.font = '16px "JetBrains Mono", monospace';
-      ctx.fillStyle = '#a0aec0';
-      ctx.fillText('Press Reset to try again', width / 2, height / 2 + 15);
+      ctx.fillText(failureType === 'crashed' ? 'CRASHED!' : 'FALLEN!', centerX, height * 0.3);
+      ctx.font = '18px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#aaa';
+      ctx.fillText('Press Reset to try again', centerX, height * 0.3 + 35);
     }
-  }, []);
+  }, [fallen, failureType]);
 
   // Animation loop
   useEffect(() => {
@@ -859,8 +911,8 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
 
     let lastTime = performance.now();
     let accumulator = 0;
-    let errorAccumulator = cumulativeError;
     let lastPlotTime = 0;
+    let localFallen = false;
 
     const loop = (currentTime) => {
       const deltaTime = Math.min(currentTime - lastTime, 50);
@@ -870,13 +922,25 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
       let latestPidResult = null;
 
       while (accumulator >= DT * 1000) {
-        const pidResult = computePIDThrust();
-        latestPidResult = pidResult;
-        simulateStep(pidResult.output);
-
         const state = stateRef.current;
-        const error = state.setpoint - state.altitude;
-        errorAccumulator += error * DT;
+        const pidResult = computePIDForce();
+        latestPidResult = pidResult;
+        let force = pidResult.totalForce;
+
+        // Add nudge force based on current time and mode
+        force += calculateNudgeForce(state.time);
+
+        // Calculate floor tilt angle
+        const floorTilt = calculateTiltAngle(state.time);
+
+        const failureResult = simulateStep(force, localFallen, floorTilt);
+
+        if (failureResult && !localFallen) {
+          localFallen = true;
+          setFallen(true);
+          setFailureType(failureResult);
+          setIsRunning(false);
+        }
 
         accumulator -= DT * 1000;
       }
@@ -884,17 +948,20 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
       const state = stateRef.current;
       if (latestPidResult && state.time - lastPlotTime >= 0.05) {
         lastPlotTime = state.time;
+        const measured = state.theta * 180 / Math.PI;
+        const setpoint = 0;
         setPlotData(prev => ({
-          setpointHistory: [...prev.setpointHistory, state.setpoint],
-          measuredHistory: [...prev.measuredHistory, state.altitude],
-          errorPHistory: [...prev.errorPHistory, latestPidResult.errorP],
-          errorIHistory: [...prev.errorIHistory, latestPidResult.errorI],
-          errorDHistory: [...prev.errorDHistory, latestPidResult.errorD],
-          thrustHistory: [...prev.thrustHistory, state.thrust],
+          setpointHistory: [...prev.setpointHistory, setpoint],
+          measuredHistory: [...prev.measuredHistory, measured],
+          errorPHistory: [...prev.errorPHistory, latestPidResult.errorP * 180 / Math.PI],
+          errorIHistory: [...prev.errorIHistory, latestPidResult.errorI * 180 / Math.PI],
+          errorDHistory: [...prev.errorDHistory, latestPidResult.errorD * 180 / Math.PI],
+          forceHistory: [...prev.forceHistory, state.force],
           timeHistory: [...prev.timeHistory, state.time - timeOffsetRef.current]
         }));
-        setCurrentThrust(state.thrust);
-        setCumulativeError(errorAccumulator);
+
+        setCurrentForce(state.force);
+        setAccumulatedError(pidController.current.getState().integral * 180 / Math.PI);
       }
 
       if (currentTime - lastRenderRef.current >= RENDER_INTERVAL) {
@@ -907,17 +974,12 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
 
     animationRef.current = requestAnimationFrame(loop);
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isRunning, computePIDThrust, simulateStep, render, cumulativeError]);
+  }, [isRunning, calculateNudgeForce, calculateTiltAngle, computePIDForce, simulateStep, render]);
 
   useEffect(() => { render(); }, [render]);
 
-  // Update mass in state when droneMass changes
-  useEffect(() => {
-    stateRef.current.mass = droneMass;
-  }, [droneMass]);
-
   const handleStart = () => {
-    if (stateRef.current.crashed) {
+    if (fallen) {
       resetSimulation();
     }
     setIsRunning(true);
@@ -934,7 +996,7 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
 
   const handleResetIntegral = () => {
     pidController.current.resetIntegral();
-    setCumulativeError(0);
+    setAccumulatedError(0);
   };
 
   return (
@@ -954,7 +1016,7 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
       <div style={{ display: 'flex', gap: '20px', width: '100%', alignItems: 'stretch' }}>
 
         {/* Left Control Panel */}
-        <div style={{ ...panelStyles.base, padding: '15px', width: '280px', flexShrink: 0, height: '360px', overflowY: 'auto', boxSizing: 'border-box' }}>
+        <div style={{ ...panelStyles.base, padding: '15px', width: '280px', flexShrink: 0, minHeight: '360px', maxHeight: '600px', overflowY: 'auto', boxSizing: 'border-box' }}>
 
           {/* Simulator Selector + Start/Stop/Reset Buttons */}
           <div style={{ marginBottom: '20px' }}>
@@ -1037,35 +1099,23 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
             </div>
           </div>
 
-          {/* Drone Weight */}
-          <div style={{ marginBottom: '20px' }}>
-            <Slider
-              label="Mass"
-              value={droneMass}
-              onChange={setDroneMass}
-              min={MIN_MASS}
-              max={MAX_MASS}
-              step={0.5}
-              unit=" kg"
-              color="#805ad5"
-            />
-          </div>
-
-          {/* Setpoint Mode */}
+          {/* Disturbance Type */}
           <div>
-            <h3 style={{ color: colors.text.secondary, fontSize: '12px', marginBottom: '10px', letterSpacing: '2px' }}>
-              SETPOINT MODE
+            <h3 style={{ color: colors.text.secondary, fontSize: '12px', marginBottom: '8px', letterSpacing: '2px' }}>
+              DISTURBANCE
             </h3>
-            <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
-              {Object.entries(SETPOINT_MODES).map(([key, value]) => (
+            <div style={{ display: 'flex', gap: '5px', marginBottom: '12px' }}>
+              {Object.entries(DISTURBANCE_TYPES).map(([key, value]) => (
                 <button
                   key={key}
-                  onClick={() => setSetpointMode(value)}
+                  onClick={() => setDisturbanceType(value)}
                   style={{
                     ...buttonStyles.base,
                     padding: '6px 12px',
                     fontSize: '10px',
-                    ...(setpointMode === value ? buttonStyles.info : buttonStyles.ghost)
+                    ...(disturbanceType === value
+                      ? (value === DISTURBANCE_TYPES.NUDGES ? buttonStyles.accent : value === DISTURBANCE_TYPES.TILTS ? buttonStyles.info : buttonStyles.primary)
+                      : buttonStyles.ghost)
                   }}
                 >
                   {key}
@@ -1073,64 +1123,52 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
               ))}
             </div>
 
-            {/* Mode-specific controls */}
-            {setpointMode === SETPOINT_MODES.CONSTANT && (
-              <Slider
-                label="Target Altitude"
-                value={constantSetpoint}
-                onChange={setConstantSetpoint}
-                min={5}
-                max={95}
-                step={1}
-                unit=" m"
-                color={colors.setpoint}
-              />
-            )}
-
-            {setpointMode === SETPOINT_MODES.SINE && (
+            {/* Nudge-specific controls */}
+            {disturbanceType === DISTURBANCE_TYPES.NUDGES && (
               <>
                 <Slider
                   label="Amplitude"
-                  value={sineAmplitude}
-                  onChange={setSineAmplitude}
+                  value={nudgeAmplitude}
+                  onChange={setNudgeAmplitude}
                   min={5}
-                  max={40}
+                  max={50}
                   step={1}
-                  unit=" m"
-                  color={colors.setpoint}
+                  unit=" N"
+                  color={colors.warning}
                 />
                 <Slider
                   label="Frequency"
-                  value={sineFrequency}
-                  onChange={setSineFrequency}
-                  min={0.01}
-                  max={0.5}
-                  step={0.01}
+                  value={nudgeFrequency}
+                  onChange={setNudgeFrequency}
+                  min={0.1}
+                  max={2.0}
+                  step={0.1}
                   unit=" Hz"
                   color={colors.secondary}
                 />
               </>
             )}
 
-            {setpointMode === SETPOINT_MODES.BOX && (
+            {/* Tilt-specific controls */}
+            {disturbanceType === DISTURBANCE_TYPES.TILTS && (
               <>
                 <Slider
                   label="Amplitude"
-                  value={boxAmplitude}
-                  onChange={setBoxAmplitude}
-                  min={5}
-                  max={40}
+                  value={tiltAmplitude}
+                  onChange={setTiltAmplitude}
+                  min={1}
+                  max={15}
                   step={1}
-                  unit=" m"
-                  color={colors.setpoint}
+                  unit="°"
+                  color={colors.info}
                 />
                 <Slider
                   label="Frequency"
-                  value={boxFrequency}
-                  onChange={setBoxFrequency}
-                  min={0.01}
-                  max={0.5}
-                  step={0.01}
+                  value={tiltFrequency}
+                  onChange={setTiltFrequency}
+                  min={0.05}
+                  max={1.0}
+                  step={0.05}
                   unit=" Hz"
                   color={colors.secondary}
                 />
@@ -1149,7 +1187,7 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
           />
         </div>
 
-        {/* Right Control Panel: PID + Status */}
+        {/* Right Control Panel: PID + Force Status */}
         <div style={{ ...panelStyles.base, padding: '15px', width: '280px', flexShrink: 0, height: '360px', overflowY: 'auto', boxSizing: 'border-box' }}>
 
           {/* PID Gains */}
@@ -1197,19 +1235,19 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
             </div>
           </div>
 
-          {/* Status Display */}
+          {/* Force Status Display */}
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '6px' }}>
-                <div style={{ color: colors.text.muted, fontSize: '9px' }}>THRUST</div>
+                <div style={{ color: colors.text.muted, fontSize: '9px' }}>FORCE</div>
                 <div style={{ color: colors.secondary, fontSize: '14px', fontWeight: 'bold' }}>
-                  {currentThrust.toFixed(0)}N
+                  {currentForce.toFixed(1)}N
                 </div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '6px' }}>
-                <div style={{ color: colors.text.muted, fontSize: '9px' }}>CUMULATIVE ERROR</div>
+                <div style={{ color: colors.text.muted, fontSize: '9px' }}>ACCUM. ERROR</div>
                 <div style={{ color: colors.warning, fontSize: '14px', fontWeight: 'bold' }}>
-                  {cumulativeError.toFixed(2)}
+                  {accumulatedError.toFixed(2)}°
                 </div>
               </div>
             </div>
@@ -1222,7 +1260,7 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
         <button
           onClick={() => {
             timeOffsetRef.current = stateRef.current.time;
-            setPlotData({ setpointHistory: [], measuredHistory: [], errorPHistory: [], errorIHistory: [], errorDHistory: [], thrustHistory: [], timeHistory: [] });
+            setPlotData({ setpointHistory: [], measuredHistory: [], errorPHistory: [], errorIHistory: [], errorDHistory: [], forceHistory: [], timeHistory: [] });
           }}
           style={{
             position: 'absolute',
@@ -1245,12 +1283,12 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
         <DataChart
           timeHistory={plotData.timeHistory}
           series={[
-            { data: plotData.setpointHistory, label: 'Setpoint (m)', color: '#00d4ff', fixedBounds: { min: 0, max: 100 } },
-            { data: plotData.measuredHistory, label: 'Measured (m)', color: '#00ff88', fixedBounds: { min: 0, max: 100 } },
-            { data: plotData.errorPHistory, label: 'E_P (m)', color: '#ff3366', sharedAxis: 'error', clampedBounds: { min: -100, max: 100 } },
-            { data: plotData.errorIHistory, label: 'E_I (m·s)', color: '#9d4edd', sharedAxis: 'error', clampedBounds: { min: -100, max: 100 } },
-            { data: plotData.errorDHistory, label: 'E_D (m/s)', color: '#ff6d00', clampedBounds: { min: -100, max: 100 } },
-            { data: plotData.thrustHistory, label: 'Thrust (N)', color: '#ffcc00' }
+            { data: plotData.setpointHistory, label: 'Setpoint (°)', color: '#00d4ff', sharedAxis: 'angle' },
+            { data: plotData.measuredHistory, label: 'Measured (°)', color: '#00ff88', sharedAxis: 'angle' },
+            { data: plotData.errorPHistory, label: 'E_P (°)', color: '#ff3366', sharedAxis: 'error', clampedBounds: { min: -90, max: 90 } },
+            { data: plotData.errorIHistory, label: 'E_I (°·s)', color: '#9d4edd', sharedAxis: 'error', clampedBounds: { min: -90, max: 90 } },
+            { data: plotData.errorDHistory, label: 'E_D (°/s)', color: '#ff6d00', clampedBounds: { min: -90, max: 90 } },
+            { data: plotData.forceHistory, label: 'Force (N)', color: '#ffcc00' }
           ]}
           width={1140}
           height={220}
@@ -1260,4 +1298,4 @@ const DroneAltitudeStandalone = ({ simulators = [], activeSimulator = '', onSimu
   );
 };
 
-export default DroneAltitudeStandalone;
+export default InvertedPendulumStandalone;
