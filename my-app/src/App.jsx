@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { InvertedPendulumSimulator, DroneAltitudeSimulator, HotTubSimulator } from './simulators';
+import { InvertedPendulumSimulator, DroneAltitudeSimulator, DroneAltitudeStandaloneSimulator, HotTubSimulator } from './simulators';
 import { fonts } from './utils/styles';
 
 const SIMULATORS = [
   { id: 'pendulum', label: 'Pendulum', component: InvertedPendulumSimulator },
   { id: 'drone', label: 'Drone', component: DroneAltitudeSimulator },
+  { id: 'drone-standalone', label: 'Drone (Standalone)', component: DroneAltitudeStandaloneSimulator },
   { id: 'hottub', label: 'Hot Tub', component: HotTubSimulator }
 ];
 
